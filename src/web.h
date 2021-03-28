@@ -15,7 +15,9 @@ extern int web_write(struct evhttp_request *req, char* buffer);
 extern int web_put_status(struct evhttp_request *req, int status, char* msg);
 extern int web_put_header(struct evhttp_request *req, char* name, char* value);
 extern int web_error(struct evhttp_request *req, int error, const char *reason);
-
+extern const char* web_get_param(struct evhttp_request* req, char* name);
+extern const char* web_get_method(struct evhttp_request* req);
+extern const char* web_getIP(struct evhttp_request* req);
 /******************************************************************************
  *
  * thread support for ts.c

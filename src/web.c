@@ -9,7 +9,7 @@
 /* Compatibility for possible missing IPv6 declarations */
 #include "web.h"
 
-#include "event2/util-internal.h"
+#include <util-internal.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,16 +44,16 @@
 #include <afunix.h>
 #endif
 
-#include "event2/event.h"
-#include "event2/http.h"
-#include "event2/listener.h"
-#include "event2/buffer.h"
-#include "event2/util.h"
-#include "event2/keyvalq_struct.h"
-#include "event2/http_struct.h"
+#include <event2/event.h>
+#include <event2/http.h>
+#include <event2/listener.h>
+#include <event2/buffer.h>
+#include <event2/util.h>
+#include <event2/keyvalq_struct.h>
+#include <event2/http_struct.h>
 
 #ifdef _WIN32
-#include "event2/thread.h"
+#include <event2/thread.h>
 #endif /* _WIN32 */
 
 #ifdef EVENT__HAVE_NETINET_IN_H
@@ -140,6 +140,66 @@ int web_read(struct evhttp_request *req, char* output_buffer, int output_buffer_
 	return 1;
 }
 
+const char* web_get_method(struct evhttp_request* req) {
+	const char* cmdtype;
+	switch (evhttp_request_get_command(req)) {
+		case EVHTTP_REQ_GET: cmdtype = "GET"; break;
+		case EVHTTP_REQ_POST: cmdtype = "POST"; break;
+		case EVHTTP_REQ_HEAD: cmdtype = "HEAD"; break;
+		case EVHTTP_REQ_PUT: cmdtype = "PUT"; break;
+		case EVHTTP_REQ_DELETE: cmdtype = "DELETE"; break;
+		case EVHTTP_REQ_OPTIONS: cmdtype = "OPTIONS"; break;
+		case EVHTTP_REQ_TRACE: cmdtype = "TRACE"; break;
+		case EVHTTP_REQ_CONNECT: cmdtype = "CONNECT"; break;
+		case EVHTTP_REQ_PATCH: cmdtype = "PATCH"; break;
+		default: cmdtype = "unknown"; break;
+	}
+	return cmdtype;
+}
+
+const char* web_getIP(struct evhttp_request* req) {
+	return req->remote_host;
+}
+
+const char* web_get_param(struct evhttp_request* req, char * name) {
+	struct evhttp_uri* decoded = NULL;
+	const char* uri = evhttp_request_get_uri(req);
+	char* query = NULL;
+	decoded = evhttp_uri_parse(uri);
+
+	printf("%s\n", evhttp_uri_get_query(decoded));
+	query = (char*)evhttp_uri_get_query(decoded);
+	/* split query into param name value pairs */
+	while (*query) {
+		char* amp = strchr(query, '&'); /* points to next '%' */
+		char* eq;
+		char* np = query;	/* points to first param name */
+
+		/* if no '%' found, then both amp and query point to eol */
+		if (amp == 0) {
+			amp = query + strlen(query);
+			query = amp;
+		}
+		/* else terminate at amp, and point query to next param */
+		else {
+			*amp = 0;
+			query = amp + 1;
+		}
+
+		/* split np at '=' char */
+		eq = strchr(np, '=');
+		if (eq != 0)
+			*eq = 0;	/* terminate np at eq */
+
+		/* add this param name/value pair */
+		if (!strcmp("input", np))
+		{
+			return (const char*)(eq == 0 ? amp : eq + 1);
+		}
+	}
+	return 0;
+}
+
 int web_write(struct evhttp_request *req, char* buffer){
 	struct evbuffer *evb = NULL;
 	/* This holds the content we're sending. */
@@ -194,12 +254,12 @@ int web_init()
 
 	g_http_server.cfg = event_config_new();
 #ifdef _WIN32
-	if (o.iocp) {
+	{
 #ifdef EVTHREAD_USE_WINDOWS_THREADS_IMPLEMENTED
 		evthread_use_windows_threads();
-		event_config_set_num_cpus_hint(cfg, 8);
+		event_config_set_num_cpus_hint(g_http_server.cfg, 8);
 #endif
-		event_config_set_flag(cfg, EVENT_BASE_FLAG_STARTUP_IOCP);
+		event_config_set_flag(g_http_server.cfg, EVENT_BASE_FLAG_STARTUP_IOCP);
 	}
 #endif
 
